@@ -19,6 +19,7 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
@@ -125,6 +126,7 @@ func NewL1CostFunc(config *params.ChainConfig, statedb StateGetter) L1CostFunc {
 	var cachedFunc l1CostFunc
 	selectFunc := func(blockTime uint64) l1CostFunc {
 		if !config.IsOptimismEcotone(blockTime) {
+			log.Debug("tracking l1 cost", "l1 cost func", "Bedrock", "time", blockTime)
 			return newL1CostFuncBedrock(config, statedb, blockTime)
 		}
 
@@ -134,6 +136,8 @@ func NewL1CostFunc(config *params.ChainConfig, statedb StateGetter) L1CostFunc {
 		l1FeeScalars := statedb.GetState(L1BlockAddr, L1FeeScalarsSlot).Bytes()
 		l1BlobBaseFee := statedb.GetState(L1BlockAddr, L1BlobBaseFeeSlot).Big()
 		l1BaseFee := statedb.GetState(L1BlockAddr, L1BaseFeeSlot).Big()
+
+		log.Debug("tracking l1 cost", "l1FeeScalars", hex.EncodeToString(l1FeeScalars), "l1BlobBaseFee", l1BlobBaseFee, "l1BaseFee", l1BaseFee)
 
 		// Edge case: the very first Ecotone block requires we use the Bedrock cost
 		// function. We detect this scenario by checking if the Ecotone parameters are
@@ -149,7 +153,10 @@ func NewL1CostFunc(config *params.ChainConfig, statedb StateGetter) L1CostFunc {
 
 		l1BaseFeeScalar, l1BlobBaseFeeScalar := extractEcotoneFeeParams(l1FeeScalars)
 
+		log.Debug("tracking l1 cost", "l1BaseFeeScalar", l1BaseFeeScalar, "l1BlobBaseFeeScalar", l1BlobBaseFeeScalar)
+
 		if config.IsOptimismFjord(blockTime) {
+			log.Debug("tracking l1 cost", "l1 cost func", "Fjord", "time", blockTime)
 			return NewL1CostFuncFjord(
 				l1BaseFee,
 				l1BlobBaseFee,
@@ -157,6 +164,7 @@ func NewL1CostFunc(config *params.ChainConfig, statedb StateGetter) L1CostFunc {
 				l1BlobBaseFeeScalar,
 			)
 		} else {
+			log.Debug("tracking l1 cost", "l1 cost func", "Ecotone", "time", blockTime)
 			return newL1CostFuncEcotone(l1BaseFee, l1BlobBaseFee, l1BaseFeeScalar, l1BlobBaseFeeScalar)
 		}
 	}
@@ -165,6 +173,7 @@ func NewL1CostFunc(config *params.ChainConfig, statedb StateGetter) L1CostFunc {
 		if rollupCostData == (RollupCostData{}) {
 			return nil // Do not charge if there is no rollup cost-data (e.g. RPC call or deposit).
 		}
+		log.Debug("tracking l1 cost", "rollupCostData", rollupCostData, "blockTime", blockTime)
 		if forBlock != blockTime {
 			if forBlock != ^uint64(0) {
 				// best practice is not to re-use l1 cost funcs across different blocks, but we
@@ -186,6 +195,7 @@ func newL1CostFuncBedrock(config *params.ChainConfig, statedb StateGetter, block
 	overhead := statedb.GetState(L1BlockAddr, OverheadSlot).Big()
 	scalar := statedb.GetState(L1BlockAddr, ScalarSlot).Big()
 	isRegolith := config.IsRegolith(blockTime)
+	log.Debug("tracking l1 cost", "l1BaseFee", l1BaseFee, "overhead", overhead, "scalar", scalar, "isRegolith", isRegolith, "time", blockTime)
 	return newL1CostFuncBedrockHelper(l1BaseFee, overhead, scalar, isRegolith)
 }
 
